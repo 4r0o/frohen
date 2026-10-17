@@ -10,7 +10,6 @@
     --panel:#0e1218;
     --panel2:#131923;
     --line:#1c2530;
-    --line2:#26313f;
     --txt:#c9d3df;
     --dim:#7c8897;
     --faint:#4a5563;
@@ -41,7 +40,6 @@
     padding:24px 18px 0;
   }
 
-  /* ── brand ── */
   #brand{
     display:flex;
     align-items:center;
@@ -88,7 +86,6 @@
     margin-top:5px;
   }
 
-  /* ── card ── */
   #wrap{
     width:100%;
     max-width:440px;
@@ -139,7 +136,6 @@
   }
   #cache.cacheok{color:var(--ok)}
 
-  /* status dot */
   #dot{
     display:inline-block;
     width:8px;height:8px;
@@ -156,7 +152,73 @@
   #dot.bad{background:var(--bad);box-shadow:0 0 0 3px rgba(224,138,127,.15)}
   #dot.ok{background:var(--ok);box-shadow:0 0 0 3px rgba(127,208,160,.15)}
 
-  /* ── footer ── */
+  /* ── button ── */
+  #jb{
+    display:none;
+    width:100%;
+    margin-top:20px;
+    padding:18px 22px;
+    border:none;
+    border-radius:14px;
+    background:linear-gradient(145deg,var(--ice) 0%,var(--ice2) 55%,#2f6ea8 100%);
+    color:#04121c;
+    font:700 17px/1 "Segoe UI", system-ui, sans-serif;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    cursor:pointer;
+    position:relative;
+    box-shadow:
+      0 0 0 1px rgba(127,208,255,.35),
+      0 14px 34px -12px rgba(127,208,255,.6),
+      inset 0 1px 0 rgba(255,255,255,.4),
+      inset 0 -2px 0 rgba(0,0,0,.15);
+    transition:transform .12s, box-shadow .2s, filter .2s;
+    -webkit-tap-highlight-color:transparent;
+    user-select:none;
+    outline:none;
+  }
+  #jb.show{display:block}
+  #jb:hover{
+    filter:brightness(1.05);
+    box-shadow:
+      0 0 0 1px rgba(127,208,255,.5),
+      0 18px 40px -12px rgba(127,208,255,.75),
+      inset 0 1px 0 rgba(255,255,255,.5),
+      inset 0 -2px 0 rgba(0,0,0,.15);
+  }
+  #jb:active{
+    transform:translateY(1px) scale(.995);
+    box-shadow:
+      0 0 0 1px rgba(127,208,255,.4),
+      0 8px 20px -10px rgba(127,208,255,.55),
+      inset 0 1px 0 rgba(255,255,255,.3),
+      inset 0 2px 4px rgba(0,0,0,.25);
+  }
+  #jb:disabled{
+    filter:grayscale(.6) brightness(.7);
+    cursor:default;
+    pointer-events:none;
+  }
+  #jb .ico{
+    display:inline-block;
+    vertical-align:middle;
+    width:16px;height:16px;
+    margin-right:10px;
+    position:relative;
+    top:-1px;
+  }
+  #jb .lbl{vertical-align:middle}
+
+  #hint{
+    display:none;
+    margin-top:12px;
+    font-size:12px;
+    color:var(--faint);
+    text-align:center;
+    letter-spacing:.03em;
+  }
+  #hint.show{display:block}
+
   #foot{
     margin-top:auto;
     padding:22px 0 20px;
@@ -202,6 +264,16 @@
 <div id="wrap">
   <div id="state"><span id="dot"></span>detecting firmware...</div>
   <div id="det"></div>
+
+  <button id="jb" type="button">
+    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M13 2 4.5 13.5h6L10 22l8.5-11.5h-6z"/>
+    </svg>
+    <span class="lbl">JAILBREAK</span>
+  </button>
+  <div id="hint"></div>
+
   <div id="cache"></div>
 </div>
 
@@ -221,21 +293,34 @@
     var stateEl = document.getElementById("state");
     var detEl   = document.getElementById("det");
     var cacheEl = document.getElementById("cache");
-    var dotEl   = document.getElementById("dot");
+    var btnEl   = document.getElementById("jb");
+    var hintEl  = document.getElementById("hint");
 
-    function setDot(c) { dotEl.className = c || ""; }
+    function setDot(c) {
+        var d = document.getElementById("dot");
+        if (d) d.className = c || "";
+    }
     function setState(t, c) {
         stateEl.innerHTML = '<span id="dot" class="' + (c || "") + '"></span>' + t;
-        dotEl = document.getElementById("dot");
         stateEl.className = c || "";
     }
     function setCache(t, ok) {
         cacheEl.textContent = t;
         cacheEl.className = ok ? "cacheok" : "";
     }
+    function showButton(hint) {
+        btnEl.classList.add("show");
+        if (hint) {
+            hintEl.textContent = hint;
+            hintEl.classList.add("show");
+        }
+    }
+    function hideButton() {
+        btnEl.classList.remove("show");
+        hintEl.classList.remove("show");
+    }
 
-    var params = new URLSearchParams(location.search);
-
+    var params  = new URLSearchParams(location.search);
     var SUPPORTED = { 1302: 1, 1304: 1, 1350: 1, 1352: 1 };
 
     var key = null, fwnum = null;
@@ -255,39 +340,37 @@
                      : " &middot; not in this build's kernel table");
 
     var target = "jb.html" + location.search;
-    function go() { setState("loading jailbreak...", "warn"); location.replace(target); }
+    var armed  = false;
 
-    function waitForTap(msg, action) {
-        setState(msg, "warn");
-        function fire() {
-            window.removeEventListener("click", fire);
-            window.removeEventListener("keydown", fire);
-            action();
-        }
-        window.addEventListener("click", fire);
-        window.addEventListener("keydown", fire);
+    function fire() {
+        if (armed) return;
+        armed = true;
+        btnEl.disabled = true;
+        btnEl.querySelector(".lbl").textContent = "LOADING...";
+        setState("loading jailbreak...", "warn");
+        location.replace(target);
     }
+    btnEl.addEventListener("click", fire);
 
     if (!supported) {
         setState("UNSUPPORTED FIRMWARE", "bad");
-        waitForTap("UNSUPPORTED (" + (key || "unknown") + ") -- press X or tap to run anyway", go);
+        showButton("press X on the button to run anyway");
         return;
     }
 
+    setState("ready", "ok");
+    showButton("tap the button to start the exploit");
+
+    // Cache warm-up in the background (does not auto-run).
     var ac = window.applicationCache;
     if (!ac || !document.documentElement.hasAttribute("manifest")) {
-        go();
+        setCache("online -- not cached");
     } else if (!navigator.onLine) {
         setCache("offline -- from cache", true);
-        go();
     } else if (ac.status === ac.IDLE) {
         setCache("cached", true);
-        go();
     } else if (ac.status === ac.UPDATEREADY) {
-        try { ac.swapCache(); } catch (e) {}
-        setCache("update downloaded", true);
-        waitForTap("UPDATE READY -- press X or tap to reload & run",
-                   function () { location.reload(); });
+        setCache("update ready -- reload to apply");
     } else {
         setCache("checking cache...");
         ac.addEventListener("downloading",
@@ -298,25 +381,19 @@
         }, false);
         ac.addEventListener("cached", function () {
             setCache("cached for offline use", true);
-            waitForTap("CACHED (first run) -- press X or tap to run", go);
         }, false);
         ac.addEventListener("updateready", function () {
             try { ac.swapCache(); } catch (e) {}
-            setCache("update downloaded", true);
-            waitForTap("UPDATE READY -- press X or tap to reload & run",
-                       function () { location.reload(); });
+            setCache("update cached", true);
         }, false);
         ac.addEventListener("noupdate", function () {
             setCache("cached -- offline ready", true);
-            go();
         }, false);
         ac.addEventListener("error", function () {
             setCache("cache unavailable");
-            waitForTap("CACHE FAILED -- press X or tap to run anyway", go);
         }, false);
         ac.addEventListener("obsolete", function () {
             setCache("cache obsolete");
-            waitForTap("CACHE OBSOLETE -- press X or tap to run", go);
         }, false);
     }
 })();
